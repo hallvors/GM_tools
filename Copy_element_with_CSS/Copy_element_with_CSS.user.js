@@ -20,7 +20,7 @@ document.addEventListener('dblclick', function (e) {
 		clones[i].className = 'elm' + counter + '_' + i;
 		cssdata['elm' + counter + '_' + i] = getNonDefaultStyles(originals[i]);
 	}
-	if(e.shiftKey){ GM_log('climbing!!');
+	if(e.shiftKey){
 		var parent = e.target.parentElement, parentClone;
 		while(parent){
 			counter++;
