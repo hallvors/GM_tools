@@ -27,8 +27,9 @@ function doTheBigStyleFixing(){
             fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
         }else if(el.ownerNode.href){
             GM_xmlhttpRequest({method:'GET',url:el.ownerNode.href, onload:function(response){
-               var rules = createFixupRulesFromCSS(response.responseText);
+               var rules = createFixupRulesFromCSS(response.responseText, el.ownerNode.href);
                 GM_addStyle(css.stringify({"type": "stylesheet",stylesheet:{rules:rules}}));
+                fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
             }, headers:{'Accept':'text/css'}});
         }else{
            GM_log('hm.. '+ el);
@@ -40,7 +41,7 @@ function doTheBigStyleFixing(){
 window.addEventListener('DOMContentLoaded', doTheBigStyleFixing, false);
 window.addEventListener('load', doTheBigStyleFixing, false);
 
-function createFixupRulesFromCSS(str){
+function createFixupRulesFromCSS(str, cssURL){
     try{
         var obj = css.parse(stripHTMLComments(str));
     }catch(e){
@@ -56,18 +57,27 @@ function createFixupRulesFromCSS(str){
                // decl.type, decl.property, decl.value
                prop = '', value = '';
                 if(decl.property === 'display' && /box$/.test(decl.value) || /(box-|flex-)/.test(decl.property)){
-                   fixupDeclarations.push(createFixupFlexboxDeclaration(decl, rule.declarations));
+                    var tmp = createFixupFlexboxDeclaration(decl, rule.declarations);
+                    prop = tmp.property, value = tmp.value;
                 }else{
-                    
                     if(/-webkit-/.test(decl.property)){
                        prop = decl.property.substr(8);
                     }
                     if(/-webkit-/.test(decl.value)){
                         value = decl.value.replace(/-webkit-/g, '');
                     }
-                    if(prop || value){
-                        fixupDeclarations.push({type:'declaration', property:prop||decl.property, value:value||decl.value});
+                }
+                if(prop || value){
+                    prop = prop || decl.property;
+                    value = value||decl.value
+                    var existingValue = getValueForProperty(rule.declarations.concat(fixupDeclarations), prop, false);
+                    if (existingValue === value) { // The declaration we want to add already exists
+                        continue;
+                    }else if(existingValue !== undefined){ // now it gets complicated. There is a declaration for the property we want to add, but the value is different..
+                        GM_log('Whoa, Sir! We want to add "' + prop + ':' + value +'", but found "' + prop + ':' + existingValue +'"');
+
                     }
+                    fixupDeclarations.push({type:'declaration', property:prop, value:value});
                 }
             }
             if(fixupDeclarations.length > 0){
@@ -86,7 +96,7 @@ function createFixupFlexboxDeclaration(decl, parent){
         propname = propname.substr(8);
     }
     if(/^-webkit-/.test(value)){
-        propname = value.substr(8);
+        value = value.substr(8);
     }
     
     var mappings = {
@@ -154,13 +164,14 @@ function createFixupFlexboxDeclaration(decl, parent){
         var dir, orient;
         if(propname === 'box-direction'){
             dir = value;
-            orient = getValueForProperty(parent, 'box-orient');
+            orient = getValueForProperty(parent, 'box-orient', true);
         }else {
             orient = value;
-            dir = getValueForProperty(parent, 'box-direction');
+            dir = getValueForProperty(parent, 'box-direction', true);
          }
         // horizontal,normal => row, vertical,normal => column. horizontal,reverse => row-reverse etc..
-        value = orient === 'horizontal' ? 'row' : 'column';
+        // lr, rl etc are handled by the simpler mapping above, so we don't need to worry about those
+        value = orient === 'vertical' ? 'column' : 'row';
         if(dir === 'reverse'){
            value += '-reverse';
         }
@@ -171,9 +182,9 @@ function createFixupFlexboxDeclaration(decl, parent){
     return {type:'declaration', property:propname, value:value};
 }
 
-function getValueForProperty(declarations, property){
+function getValueForProperty(declarations, property, prefixAgnostic){
     for(var i=0;i<declarations.length;i++){
-       if(declarations[i].property == property || declarations[i].property.substr(8) == property) return declarations[i].value;
+       if(declarations[i].property == property || (prefixAgnostic && declarations[i].property.substr(8) == property)) return declarations[i].value;
     }
 }
 
