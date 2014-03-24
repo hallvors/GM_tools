@@ -19,22 +19,32 @@ var warnAgainstPotentiallyOverwrittenValues = false;
 var allW3CSSProperties = ["align-content","align-items","align-self","alignment-adjust","alignment-baseline","all","anchor-point","animation","animation-delay","animation-direction","animation-duration","animation-fill-mode","animation-iteration-count","animation-name","animation-play-state","animation-timing-function","appearance","azimuth","backface-visibility","background","background-attachment","background-clip","background-color","background-image","background-origin","background-position","background-repeat","background-size","baseline-shift","binding","bleed","bookmark-label","bookmark-level","bookmark-state","bookmark-target","border","border-bottom","border-bottom-color","border-bottom-left-radius","border-bottom-right-radius","border-bottom-style","border-bottom-width","border-collapse","border-color","border-image","border-image-outset","border-image-repeat","border-image-slice","border-image-source","border-image-width","border-left","border-left-color","border-left-style","border-left-width","border-radius","border-right","border-right-color","border-right-style","border-right-width","border-spacing","border-style","border-top","border-top-color","border-top-left-radius","border-top-right-radius","border-top-style","border-top-width","border-width","bottom","box-decoration-break","box-shadow","box-sizing","break-after","break-before","break-inside","caption-side","chains","clear","clip","clip-path","clip-rule","color","color-interpolation-filters","color-profile","column-count","column-fill","column-gap","column-rule","column-rule-color","column-rule-style","column-rule-width","column-span","column-width","columns","contain","content","counter-increment","counter-reset","crop","cue","cue-after","cue-before","cursor","direction","display","dominant-baseline","drop-initial-after-adjust","drop-initial-after-align","drop-initial-before-adjust","drop-initial-before-align","drop-initial-size","drop-initial-value","elevation","empty-cells","filter","flex","flex-basis","flex-direction","flex-flow","flex-grow","flex-shrink","flex-wrap","float","float-offset","flood-color","flood-opacity","flow-from","flow-into","font","font-family","font-feature-settings","font-kerning","font-language-override","font-size","font-size-adjust","font-stretch","font-style","font-synthesis","font-variant","font-variant-alternates","font-variant-caps","font-variant-east-asian","font-variant-ligatures","font-variant-numeric","font-variant-position","font-weight","grid","grid-area","grid-auto-columns","grid-auto-flow","grid-auto-position","grid-auto-rows","grid-column","grid-column-end","grid-column-start","grid-row","grid-row-end","grid-row-start","grid-template","grid-template-areas","grid-template-columns","grid-template-rows","hanging-punctuation","height","hyphens","icon","image-orientation","image-resolution","ime-mode","inline-box-align","justify-content","justify-items","justify-self","left","letter-spacing","lighting-color","line-break","line-height","line-stacking","line-stacking-ruby","line-stacking-shift","line-stacking-strategy","list-style","list-style-image","list-style-position","list-style-type","margin","margin-bottom","margin-left","margin-right","margin-top","marker-offset","marks","mask","mask-box","mask-box-outset","mask-box-repeat","mask-box-slice","mask-box-source","mask-box-width","mask-clip","mask-image","mask-origin","mask-position","mask-repeat","mask-size","mask-source-type","mask-type","max-height","max-lines","max-width","min-height","min-width","move-to","nav-down","nav-index","nav-left","nav-right","nav-up","object-fit","object-position","opacity","order","orphans","outline","outline-color","outline-offset","outline-style","outline-width","overflow","overflow-wrap","overflow-x","overflow-y","padding","padding-bottom","padding-left","padding-right","padding-top","page","page-break-after","page-break-before","page-break-inside","page-policy","pause","pause-after","pause-before","perspective","perspective-origin","pitch","pitch-range","play-during","position","presentation-level","quotes","region-fragment","rendering-intent","resize","rest","rest-after","rest-before","richness","right","rotation","rotation-point","ruby-align","ruby-overhang","ruby-position","ruby-span","shape-image-threshold","shape-outside","shape-margin","size","speak","speak-as","speak-header","speak-numeral","speak-punctuation","speech-rate","stress","string-set","tab-size","table-layout","target","target-name","target-new","target-position","text-align","text-align-last","text-combine-horizontal","text-decoration","text-decoration-color","text-decoration-line","text-decoration-skip","text-decoration-style","text-emphasis","text-emphasis-color","text-emphasis-position","text-emphasis-style","text-height","text-indent","text-justify","text-orientation","text-outline","text-overflow","text-shadow","text-space-collapse","text-transform","text-underline-position","text-wrap","top","transform","transform-origin","transform-style","transition","transition-delay","transition-duration","transition-property","transition-timing-function","unicode-bidi","vertical-align","visibility","voice-balance","voice-duration","voice-family","voice-pitch","voice-range","voice-rate","voice-stress","voice-volume","volume","white-space","widows","width","word-break","word-spacing","word-wrap","wrap-flow","wrap-through","writing-mode","z-index"];
 
 function doTheBigStyleFixing(){    
-    var fixupStyle = {"type": "stylesheet", stylesheet: {rules: []}};
     //GM_log('GM CSS fixed running '+document.styleSheets.length);
 
     for(var el, i = document.styleSheets.length - 1; i>=0; i--){
         el = document.styleSheets[i];
+        var fixupStyle = {"type": "stylesheet", stylesheet: {rules: []}};
         if(fixedElms.indexOf(el.ownerNode)>-1)continue;
         if(/style/i.test(el.ownerNode.tagName)){
             var rules = createFixupRulesFromCSS(stripHTMLComments(el.ownerNode.textContent));
-            fixupStyle.stylesheet.rules = fixupStyle.stylesheet.rules.concat(rules);
-            GM_log(css.stringify(fixupStyle));
-            GM_addStyle(css.stringify(fixupStyle));
+            copyJSDefinedStyles(rules, fixupStyle);
+            //fixupStyle.stylesheet.rules = fixupStyle.stylesheet.rules.concat(rules);
+            var cssStr = css.stringify(fixupStyle);
+            if(cssStr !== ''){
+                GM_log('will insert: \n'+css.stringify(fixupStyle));
+                GM_addStyle(cssStr);
+            }
             fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
         }else if(el.ownerNode.href){
             GM_xmlhttpRequest({method:'GET',url:el.ownerNode.href, onload:function(response){
-               var rules = createFixupRulesFromCSS(response.responseText, el.ownerNode.href);
-                GM_addStyle(css.stringify({"type": "stylesheet",stylesheet:{rules:rules}}));
+                var fixupStyle = {"type": "stylesheet", stylesheet: {rules: []}};
+                var rules = createFixupRulesFromCSS(response.responseText);
+                copyJSDefinedStyles(rules, fixupStyle);
+                var cssStr = css.stringify(fixupStyle);
+                if(cssStr !== ''){
+                    GM_log('will insert: \n'+css.stringify(fixupStyle));
+                    GM_addStyle(cssStr);
+                }
                 fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
             }, headers:{'Accept':'text/css'}});
         }else{
@@ -47,7 +57,7 @@ function doTheBigStyleFixing(){
 window.addEventListener('DOMContentLoaded', doTheBigStyleFixing, false);
 window.addEventListener('load', doTheBigStyleFixing, false);
 
-function createFixupRulesFromCSS(str, cssURL){
+function createFixupRulesFromCSS(str){
     try{
         var obj = css.parse(stripHTMLComments(str));
     }catch(e){
@@ -56,23 +66,25 @@ function createFixupRulesFromCSS(str, cssURL){
     }
     var fixupRules = [], fixupDeclarations, prop, value;
     for(var rule, i = 0; rule = obj.stylesheet.rules[i]; i++){
-       // rule.type, rule.selectors, rule.declarations
+        insertFixupDeclarations(rule);
+    }
+    function insertFixupDeclarations(rule){
+       // rule.type, rule.selectors, rule.declarations (rule.comment, rule.media)
         if(rule.declarations){
             fixupDeclarations = [];
             for(var decl, j = 0; decl = rule.declarations[j]; j++){
                // decl.type, decl.property, decl.value
                prop = '', value = '';
-               
                // sometimes sites include a background fallback colour but in the *same* declaration as -webkit-gradient.
                // It is better practise to have a separate 'background' declaration for the fallback colour. Let's add it.
                if(decl.property === 'background' && /(#\w{3,6})\s*-webkit-/.test(decl.value)){ // TODO: in reality, the color and -webkit-foo() could be in any order.. is this a problem?
-                    fixupDeclarations.push({type:'declaration', property:'background', value:RegExp.$1});
+                    fixupDeclarations.push({type:'declaration', property:'background', value:RegExp.$1, _fxjsdefined:true});
                     decl.value = decl.value.replace(/(#\w{3,6})\s*-webkit-/, '-webkit-');
                }
                 if(decl.property === 'display' && /box$/.test(decl.value) || /(box-|flex-)/.test(decl.property)){
                     var tmp = createFixupFlexboxDeclaration(decl, rule.declarations);
                     prop = tmp.property, value = tmp.value;
-                }else if(/-webkit-gradient/i.test(decl.value)){GM_log(decl.value)
+                }else if(/-webkit-gradient/i.test(decl.value)){
                     var tmp = createFixupGradientDeclaration(decl, rule.declarations);
                     prop = tmp.property, value = tmp.value;
                 }else{
@@ -85,32 +97,34 @@ function createFixupRulesFromCSS(str, cssURL){
                 }
                 if(prop || value){
                     prop = prop || decl.property;
-                    value = value||decl.value
+                    value = value || decl.value
                     if(hasDeclaration(fixupDeclarations.concat(rule.declarations), prop, value, false, true))continue;
                     if(warnAgainstPotentiallyOverwrittenValues){
                         var existingValue = getValueForProperty(fixupDeclarations.concat(rule.declarations), prop, false);
                         if(existingValue !== undefined && !/(-webkit-|box)/.test(existingValue)){ // now it gets complicated. There is a declaration for the property we want to add, but the value is different..
-                            console.log('Whoa, Sir! We want to add "' + prop + ':' + value +'", but found "' + prop + ':' + existingValue +'"');
+                            GM_log('Whoa, Sir! We want to add "' + prop + ':' + value +'", but found "' + prop + ':' + existingValue +'"');
 
                         }                       
                     }
                     // We follow the standards - better not to pseudo-standardise -webkit-something
                     if(allW3CSSProperties.indexOf(prop) === -1)continue;
-                    fixupDeclarations.push({type:'declaration', property:prop, value:value});
+                    fixupDeclarations.push({type:'declaration', property:prop, value:value, _fxjsdefined:true});
                     // extra gotcha: per Gecko's reading of the spec, border-image will only appear if border-style or border-width is set..
                     if(prop === 'border-image' && getValueForProperty(fixupDeclarations.concat(rule.declarations), 'border-style', false) === undefined){
-                        //fixupDeclarations[fixupDeclarations.length - 1].value += ' fill';
-                        fixupDeclarations.push({type:'declaration', property:'border-style', value:'solid'});
+                        fixupDeclarations.push({type:'declaration', property:'border-style', value:'solid', _fxjsdefined:true});
                     }
                 }
-            }
+            }// done iterating declarations in this rule
             if(fixupDeclarations.length > 0){
-                fixupRules.push({type:'rule', selectors:rule.selectors.concat([]), declarations:fixupDeclarations.concat([])});
+                rule.declarations = rule.declarations.concat(fixupDeclarations); // add our custom declarations to the end of the current rules
             }
+        }else if(rule.rules){
+            for (var k = 0; k < rule.rules.length; k++) {
+                insertFixupDeclarations(rule.rules[k]);
+            };
         }
     }
-    if(fixupRules.length)GM_log('created fixup rules'+'\n'+JSON.stringify(fixupRules)+'\n'+css.stringify({"type": "stylesheet",stylesheet:{rules:fixupRules}}));
-    return fixupRules;
+    return obj;
 }
 
 function createFixupFlexboxDeclaration(decl, parent){
@@ -176,7 +190,7 @@ function createFixupFlexboxDeclaration(decl, parent){
     }
     // some stuff is more complicated than a simple substitution..
     // box-flex:0 maps to 'none', other values need 'auto' appended - thanks to Daniel Holbert
-    if(propname === 'box-flex'){
+    if(propname === 'flex'){
         if(decl.value == 0){
             value = 'none';
         }else{
@@ -203,14 +217,14 @@ function createFixupFlexboxDeclaration(decl, parent){
     }
     
     
-    return {type:'declaration', property:propname, value:value};
+    return {type:'declaration', property:propname, value:value, _fxjsdefined:true};
 }
 
 function createFixupGradientDeclaration(decl, parent){
     var value = decl.value, newValue='', prop = decl.property.replace(/-webkit-/, '');
     // -webkit-gradient(<type>, <point> [, <radius>]?, <point> [, <radius>]? [, <stop>]*)
     // fff -webkit-gradient(linear,0 0,0 100%,from(#fff),to(#f6f6f6));
-    var m = value.match(/-webkit-gradient\s*\(\s*(linear|radial)\s*(.*)\)(.*)/), points=[], fromColor, toColor, stops=[];
+    var m = value.match(/-webkit-gradient\s*\(\s*(linear|radial)\s*(.*)\)(.*)/), points=[], toColor, stops=[];
     if(m){ // yay, really old syntax...
         // extracting the values..
         var parts = oldGradientParser(value), type; //GM_log(JSON.stringify(parts, null, 2))
@@ -265,13 +279,8 @@ function createFixupGradientDeclaration(decl, parent){
             }
 
             // translating values to right syntax
-            if(fromColor){
-                newValue += ', ' + fromColor + ' 0%';
-            }
-            if(stops){
-                for(var j = 0; j < stops.length; j++){
-                    newValue += ', ' + stops[j];
-                }
+            for(var j = 0; j < stops.length; j++){
+                newValue += ', ' + stops[j];
             }
             if(toColor){
                 newValue += ', ' + toColor + ' 100%';
@@ -294,8 +303,8 @@ function createFixupGradientDeclaration(decl, parent){
          });
 
     }
-    GM_log(newValue)
-    return {type:'declaration', property:prop, value:newValue};
+    //GM_log(newValue)
+    return {type:'declaration', property:prop, value:newValue, _fxjsdefined:true};
 }
 
 function getValueForProperty(declarations, property, prefixAgnostic){
@@ -372,6 +381,39 @@ function stripHTMLComments (str) {
     str = str.replace(/^\s*<!--/, '');
     str = str.replace(/-->\s*$/, '');
     return str;
+}
+
+function copyJSDefinedStyles(sheet1, sheet2){
+    for(var rule, i = 0; rule = sheet1.stylesheet.rules[i]; i++){
+        var clone = cloneJSDefined(rule);
+        if(clone.declarations && clone.declarations.length || clone.rules && clone.rules.length){
+            sheet2.stylesheet.rules = sheet2.stylesheet.rules.concat(clone)
+        }
+    }
+    function cloneJSDefined(rule){
+        var returnObj = {};
+        for(var key in rule){
+            if(rule[key] instanceof Array && key !== 'selectors'){
+                returnObj[key] = [];
+            }else{
+                returnObj[key] = rule[key];
+            }
+        }
+        if('declarations' in rule){
+            for(var i = 0, decl; decl = rule.declarations[i]; i++){
+                if(decl._fxjsdefined)returnObj.declarations.push(decl);
+            }  
+        }
+        if('rules' in rule){
+            for(var i = 0, subrule; subrule = rule.rules[i]; i++){
+                var subclone = cloneJSDefined(subrule);
+                if(subclone.rules && subclone.rules.length || subclone.declarations && subclone.declarations.length){
+                    returnObj.rules.push(subclone);
+                }
+            }  
+        }
+        return returnObj;
+    }
 }
 
 // unsafeWindow.CSS2Properties.prototype.__defineSetter__('background-image', function(str){this['backgroundImage']=str;})
