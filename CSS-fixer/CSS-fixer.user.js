@@ -27,6 +27,7 @@ function doTheBigStyleFixing(){
         if(fixedElms.indexOf(el.ownerNode)>-1)continue;
         if(/style/i.test(el.ownerNode.tagName)){
             var rules = createFixupRulesFromCSS(stripHTMLComments(el.ownerNode.textContent));
+            if(!rules) continue;
             copyJSDefinedStyles(rules, fixupStyle);
             //fixupStyle.stylesheet.rules = fixupStyle.stylesheet.rules.concat(rules);
             var cssStr = css.stringify(fixupStyle);
@@ -62,7 +63,7 @@ function createFixupRulesFromCSS(str){
         var obj = css.parse(stripHTMLComments(str));
     }catch(e){
         GM_log('failed to parse '+str);
-        return [];
+        return;
     }
     var fixupRules = [], fixupDeclarations, prop, value;
     for(var rule, i = 0; rule = obj.stylesheet.rules[i]; i++){
@@ -98,6 +99,17 @@ function createFixupRulesFromCSS(str){
                 if(prop || value){
                     prop = prop || decl.property;
                     value = value || decl.value
+                    // We follow the standards - better not to pseudo-standardise -webkit-something
+                    if(allW3CSSProperties.indexOf(prop) === -1)continue;
+                    // some stuff is (still) prefixed in Gecko, though.. box-sizing in particular is just being unprefixed now
+                    if(! (hyph2camel(prop) in document.documentElement.style)){
+                        if(hyph2camel('-moz-' + prop) in document.documentElement.style){
+                            prop = '-moz-' + prop;
+                        }else{
+                            GM_log('WARNING: no support for ' + prop + ', not even for -moz-' + prop );
+                            continue;
+                        }
+                    }
                     if(hasDeclaration(fixupDeclarations.concat(rule.declarations), prop, value, false, true))continue;
                     if(warnAgainstPotentiallyOverwrittenValues){
                         var existingValue = getValueForProperty(fixupDeclarations.concat(rule.declarations), prop, false);
@@ -106,8 +118,6 @@ function createFixupRulesFromCSS(str){
 
                         }                       
                     }
-                    // We follow the standards - better not to pseudo-standardise -webkit-something
-                    if(allW3CSSProperties.indexOf(prop) === -1)continue;
                     fixupDeclarations.push({type:'declaration', property:prop, value:value, _fxjsdefined:true});
                     // extra gotcha: per Gecko's reading of the spec, border-image will only appear if border-style or border-width is set..
                     if(prop === 'border-image' && getValueForProperty(fixupDeclarations.concat(rule.declarations), 'border-style', false) === undefined){
@@ -414,6 +424,10 @@ function copyJSDefinedStyles(sheet1, sheet2){
         }
         return returnObj;
     }
+}
+
+function hyph2camel(str){
+    return str.replace(/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
 }
 
 // unsafeWindow.CSS2Properties.prototype.__defineSetter__('background-image', function(str){this['backgroundImage']=str;})
