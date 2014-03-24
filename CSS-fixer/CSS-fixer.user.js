@@ -33,8 +33,8 @@ function doTheBigStyleFixing(){
             if(cssStr !== ''){
                 GM_log('will insert: \n'+css.stringify(fixupStyle));
                 GM_addStyle(cssStr);
+                fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
             }
-            fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
         }else if(el.ownerNode.href){
             GM_xmlhttpRequest({method:'GET',url:el.ownerNode.href, onload:function(response){
                 var fixupStyle = {"type": "stylesheet", stylesheet: {rules: []}};
@@ -44,8 +44,8 @@ function doTheBigStyleFixing(){
                 if(cssStr !== ''){
                     GM_log('will insert: \n'+css.stringify(fixupStyle));
                     GM_addStyle(cssStr);
+                    fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
                 }
-                fixedElms.push(document.styleSheets[document.styleSheets.length - 1]); // GM_addStyle inserts a <style> element, which doesn't need fixing later on..
             }, headers:{'Accept':'text/css'}});
         }else{
            GM_log('hm.. '+ el);
