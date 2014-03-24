@@ -13,20 +13,20 @@ document.addEventListener('dblclick', function (e) {
 	var cssdata = {}, counter = 0;
 	var elm = e.target.cloneNode(true);
 	// We get styles for the clicked element and every element inside it..
-	elm.className = 'elm' + counter;
-	cssdata['elm' + counter] = getNonDefaultStyles(e.target);
+	elm.className = elm.className || 'elm' + counter;
+	cssdata[elm.className] = getNonDefaultStyles(e.target);
 	var clones = elm.getElementsByTagName('*'), originals = e.target.getElementsByTagName('*');
 	for(var i = 0; i < originals.length; i++){
-		clones[i].className = 'elm' + counter + '_' + i;
-		cssdata['elm' + counter + '_' + i] = getNonDefaultStyles(originals[i]);
+		clones[i].className = clones[i].className || 'elm' + counter + '_' + i;
+		cssdata[clones[i].className] = getNonDefaultStyles(originals[i]);
 	}
 	if(e.shiftKey){
 		var parent = e.target.parentElement, parentClone;
 		while(parent){
 			counter++;
 			parentClone = parent.cloneNode(false);
-			parentClone.className = 'elm' + counter;
-			cssdata['elm' + counter] = getNonDefaultStyles(parent);
+			parentClone.className = parentClone.className || 'elm' + counter;
+			cssdata[parentClone.className] = getNonDefaultStyles(parent);
 			parentClone.appendChild(elm);
 			elm = parentClone;
 			parent = parent.parentElement;
